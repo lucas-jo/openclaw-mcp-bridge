@@ -1,0 +1,31 @@
+{
+  "name": "openclaw-mcp-bridge",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) bridge for OpenClaw Gateway",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "keywords": [
+    "mcp",
+    "openclaw",
+    "bridge",
+    "automation",
+    "browser-control",
+    "remote-agent"
+  ],
+  "author": "Lucas Jo",
+  "license": "MIT",
+  "dependencies": {
+
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.14",
+    "bun-types": "latest",
+    "typescript": "^5.7.0"
+  }
+}
