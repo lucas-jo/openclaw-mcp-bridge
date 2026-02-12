@@ -93,4 +93,4 @@ Add to your `mcpServers` config:
 
 ## 📜 License
 
-MIT © [Lucas Jo](https://github.com/lucasjo)
+MIT © [Lucas Jo](https://github.com/lucas-jo)
