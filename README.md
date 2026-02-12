@@ -91,6 +91,11 @@ Add to your `mcpServers` config:
 | `openclaw_nodes_list` | List connected OpenClaw nodes |
 | `openclaw_gateway_call` | Direct RPC access to OpenClaw Gateway |
 
+## 📖 Documentation
+
+- **[RECIPES.md](./RECIPES.md)**: Connectivity options (SSH Tunneling, Cloudflare Tunnel, etc.).
+- **[SETUP.md](./SETUP.md)**: Detailed architecture, protocol details, and manual troubleshooting.
+
 ## 📜 License
 
 MIT © [Lucas Jo](https://github.com/lucas-jo)
