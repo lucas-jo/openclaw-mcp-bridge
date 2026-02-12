@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Model Context Protocol (MCP) bridge for OpenClaw Gateway",
   "main": "src/index.ts",
+  "bin": {
+    "openclaw-mcp-bridge": "./src/index.ts"
+  },
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
@@ -19,8 +22,8 @@
   "author": "Lucas Jo",
   "license": "MIT",
   "dependencies": {
-
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "dotenv": "^17.2.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {

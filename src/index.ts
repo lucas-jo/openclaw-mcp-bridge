@@ -1,5 +1,8 @@
+#!/usr/bin/env bun
+import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "http";
 import crypto from "crypto";
 import { GatewayClient } from "./gateway-client.js";
@@ -9,6 +12,7 @@ const GATEWAY_HOST = process.env.OPENCLAW_GATEWAY_HOST ?? "127.0.0.1";
 const GATEWAY_PORT = parseInt(process.env.OPENCLAW_GATEWAY_PORT ?? "18790", 10);
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "";
 const BRIDGE_PORT = parseInt(process.env.BRIDGE_PORT ?? "3100", 10);
+const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY ?? "";
 
 if (!GATEWAY_TOKEN) {
   console.error("OPENCLAW_GATEWAY_TOKEN is required");
@@ -35,10 +39,10 @@ function registerTools(server: McpServer): void {
 
 server.tool(
   "openclaw_gateway_call",
-  "Call any OpenClaw Gateway RPC method directly. Use for: health checks, config, sessions, etc.",
+  "Call OpenClaw Gateway RPC",
   {
-    method: z.string().describe("RPC method name (e.g. 'health', 'config.get', 'sessions.list')"),
-    params: z.record(z.string(), z.unknown()).optional().describe("RPC parameters as JSON object"),
+    method: z.string().describe("Method (health, config.get, etc)"),
+    params: z.record(z.string(), z.unknown()).optional().describe("Params"),
   },
   async ({ method, params }) => {
     const result = await gateway.call(method, params);
@@ -48,7 +52,7 @@ server.tool(
 
 server.tool(
   "openclaw_nodes_list",
-  "List all connected OpenClaw nodes and their capabilities",
+  "List OpenClaw nodes",
   {},
   async () => {
     const result = await gateway.call("node.list");
@@ -58,11 +62,11 @@ server.tool(
 
 server.tool(
   "openclaw_nodes_invoke",
-  "Invoke a command on an OpenClaw node (canvas, camera, system, screen, etc.)",
+  "Invoke node command",
   {
-    nodeId: z.string().describe("Node ID, name, or IP"),
-    command: z.string().describe("Command to invoke (e.g. 'canvas.navigate', 'canvas.snapshot', 'system.run', 'camera.snap')"),
-    params: z.record(z.string(), z.unknown()).optional().describe("Command parameters"),
+    nodeId: z.string().describe("Node ID or name"),
+    command: z.string().describe("Command (canvas.navigate, etc)"),
+    params: z.record(z.string(), z.unknown()).optional().describe("Params"),
   },
   async ({ nodeId, command, params }) => {
     const result = await gateway.call("node.invoke", {
@@ -77,11 +81,11 @@ server.tool(
 
 server.tool(
   "openclaw_browser_navigate",
-  "Navigate the local browser to a URL",
+  "Navigate local browser",
   {
-    url: z.string().describe("URL to navigate to"),
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    profile: z.string().optional().describe("Browser profile ('chrome' for relay, 'openclaw' for isolated)"),
+    url: z.string().describe("URL"),
+    targetId: z.string().optional().describe("Tab ID"),
+    profile: z.string().optional().describe("Profile (chrome/openclaw)"),
   },
   async ({ url, targetId, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -96,12 +100,12 @@ server.tool(
 
 server.tool(
   "openclaw_browser_screenshot",
-  "Take a screenshot of the local browser",
+  "Take browser screenshot",
   {
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    fullPage: z.boolean().optional().describe("Capture full page"),
-    type: z.enum(["png", "jpeg"]).optional().describe("Image format"),
-    profile: z.string().optional().describe("Browser profile"),
+    targetId: z.string().optional().describe("Tab ID"),
+    fullPage: z.boolean().optional().describe("Full page"),
+    type: z.enum(["png", "jpeg"]).optional().describe("Format"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ targetId, fullPage, type, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -126,11 +130,11 @@ server.tool(
 
 server.tool(
   "openclaw_browser_snapshot",
-  "Get accessibility tree snapshot of the local browser page (for AI interaction)",
+  "Get browser accessibility tree",
   {
-    format: z.enum(["aria", "ai"]).optional().describe("Snapshot format: 'aria' or 'ai'"),
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    profile: z.string().optional().describe("Browser profile"),
+    format: z.enum(["aria", "ai"]).optional().describe("Format (aria/ai)"),
+    targetId: z.string().optional().describe("Tab ID"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ format, targetId, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -148,11 +152,11 @@ server.tool(
 
 server.tool(
   "openclaw_browser_click",
-  "Click an element in the local browser (by accessibility ref)",
+  "Click element",
   {
-    ref: z.string().describe("Element reference from snapshot"),
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    profile: z.string().optional().describe("Browser profile"),
+    ref: z.string().describe("Element ref"),
+    targetId: z.string().optional().describe("Tab ID"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ ref, targetId, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -167,13 +171,13 @@ server.tool(
 
 server.tool(
   "openclaw_browser_type",
-  "Type text into an element in the local browser",
+  "Type text into element",
   {
-    ref: z.string().describe("Element reference from snapshot"),
-    text: z.string().describe("Text to type"),
-    submit: z.boolean().optional().describe("Press Enter after typing"),
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    profile: z.string().optional().describe("Browser profile"),
+    ref: z.string().describe("Element ref"),
+    text: z.string().describe("Text"),
+    submit: z.boolean().optional().describe("Press Enter"),
+    targetId: z.string().optional().describe("Tab ID"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ ref, text, submit, targetId, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -188,11 +192,11 @@ server.tool(
 
 server.tool(
   "openclaw_browser_evaluate",
-  "Execute JavaScript in the local browser",
+  "Run JS in browser",
   {
-    fn: z.string().describe("JavaScript code to evaluate"),
-    targetId: z.string().optional().describe("Browser tab target ID"),
-    profile: z.string().optional().describe("Browser profile"),
+    fn: z.string().describe("JS code"),
+    targetId: z.string().optional().describe("Tab ID"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ fn, targetId, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -207,9 +211,9 @@ server.tool(
 
 server.tool(
   "openclaw_browser_tabs",
-  "List open browser tabs",
+  "List browser tabs",
   {
-    profile: z.string().optional().describe("Browser profile"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ profile }) => {
     const result = await gateway.call("browser.request", {
@@ -223,10 +227,10 @@ server.tool(
 
 server.tool(
   "openclaw_browser_open",
-  "Open a URL in a new browser tab",
+  "Open URL in new tab",
   {
-    url: z.string().describe("URL to open"),
-    profile: z.string().optional().describe("Browser profile"),
+    url: z.string().describe("URL"),
+    profile: z.string().optional().describe("Profile"),
   },
   async ({ url, profile }) => {
     const result = await gateway.call("browser.request", {
@@ -241,13 +245,13 @@ server.tool(
 
 server.tool(
   "openclaw_system_run",
-  "Execute a shell command on the local machine via OpenClaw node",
+  "Run shell command",
   {
-    nodeId: z.string().describe("Node ID, name, or IP"),
-    command: z.string().describe("Shell command to execute"),
-    cwd: z.string().optional().describe("Working directory"),
-    env: z.record(z.string(), z.string()).optional().describe("Environment variables"),
-    timeoutMs: z.number().optional().describe("Command timeout in milliseconds"),
+    nodeId: z.string().describe("Node ID"),
+    command: z.string().describe("Command"),
+    cwd: z.string().optional().describe("Working dir"),
+    env: z.record(z.string(), z.string()).optional().describe("Env vars"),
+    timeoutMs: z.number().optional().describe("Timeout (ms)"),
   },
   async ({ nodeId, command, cwd, env, timeoutMs }) => {
     const params: Record<string, unknown> = {
@@ -273,6 +277,16 @@ const sessions = new Map<string, { transport: SSEServerTransport; server: McpSer
 
 const httpServer = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+
+  // Auth check if BRIDGE_API_KEY is set
+  if (BRIDGE_API_KEY) {
+    const apiKey = req.headers["x-api-key"] || url.searchParams.get("apiKey");
+    if (apiKey !== BRIDGE_API_KEY) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized: Invalid or missing BRIDGE_API_KEY" }));
+      return;
+    }
+  }
 
   if (url.pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -312,23 +326,33 @@ const httpServer = createServer(async (req, res) => {
   res.end("Not found");
 });
 
+async function runStdioServer() {
+  const server = createBridgeServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[bridge] MCP stdio server running");
+}
+
+async function runSseServer() {
+  httpServer.listen(BRIDGE_PORT, "0.0.0.0", () => {
+    console.error(`[bridge] MCP SSE server listening on http://0.0.0.0:${BRIDGE_PORT}`);
+    console.error(`[bridge] SSE endpoint: http://0.0.0.0:${BRIDGE_PORT}/sse`);
+    console.error(`[bridge] Health: http://0.0.0.0:${BRIDGE_PORT}/health`);
+  });
+}
+
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const transportArg = args.find(arg => arg.startsWith("--transport="))?.split("=")[1] ?? "sse";
+
   await gateway.connect();
   console.error(`[bridge] Gateway connected: ${GATEWAY_HOST}:${GATEWAY_PORT}`);
 
-  httpServer.listen(BRIDGE_PORT, "0.0.0.0", () => {
-    console.error(`[bridge] MCP server listening on http://0.0.0.0:${BRIDGE_PORT}`);
-    console.error(`[bridge] SSE endpoint: http://0.0.0.0:${BRIDGE_PORT}/sse`);
-    console.error(`[bridge] Health: http://0.0.0.0:${BRIDGE_PORT}/health`);
-    console.error("");
-    console.error("Add to remote OpenCode config:");
-    console.error(JSON.stringify({
-      "openclaw-bridge": {
-        type: "remote",
-        url: `http://<tailscale-ip>:${BRIDGE_PORT}/sse`,
-      },
-    }, null, 2));
-  });
+  if (transportArg === "stdio") {
+    await runStdioServer();
+  } else {
+    await runSseServer();
+  }
 }
 
 main().catch((err) => {

@@ -32,52 +32,53 @@ graph LR
     end
 ```
 
-## 🛠 Prerequisites
+## ⚡ Quick Start (One-liner Install)
 
-- [Bun](https://bun.sh) runtime installed.
-- [OpenClaw](https://openclaw.ai) installed and running on your local machine.
-- (Optional) [Tailscale](https://tailscale.com) for secure remote access without port forwarding.
-
-## 📦 Installation
+Run this on your local machine (e.g. MacBook) to install and configure everything automatically:
 
 ```bash
-git clone https://github.com/lucasjo/openclaw-mcp-bridge.git
-cd openclaw-mcp-bridge
-bun install
+curl -fsSL https://raw.githubusercontent.com/lucas-jo/openclaw-mcp-bridge/main/install.sh | bash
 ```
 
 ## ⚙️ Configuration
 
-Set the following environment variables:
+The installer creates a `.env` file in the project directory. You can manually adjust these values:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OPENCLAW_GATEWAY_TOKEN` | Your OpenClaw Gateway auth token | **Required** |
+| `BRIDGE_API_KEY` | Secret key for the bridge itself | (Auto-generated) |
 | `OPENCLAW_GATEWAY_HOST` | Local OpenClaw Gateway host | `127.0.0.1` |
 | `OPENCLAW_GATEWAY_PORT` | Local OpenClaw Gateway port | `18790` |
 | `BRIDGE_PORT` | Port for the MCP SSE server | `3100` |
 
 ## 🏃 Running the Bridge
 
+### Option 1: SSE Mode (Server)
+Ideal for remote agents connecting via network (e.g., dgx-99 to MacBook).
 ```bash
-OPENCLAW_GATEWAY_TOKEN=your_token_here bun run start
+bun run start --transport=sse
+```
+
+### Option 2: Stdio Mode (CLI) - Recommended for Local
+Ideal for local agents like Cursor or Windsurf. Lower latency and token-efficient.
+```bash
+bun run start --transport=stdio
 ```
 
 ## 🤖 Adding to your Agent
 
-### OpenCode / Cursor / Windsurf
-Add the following MCP configuration:
-
+### Remote Agent (SSE)
+Add to your `mcpServers` config:
 ```json
 {
-  "mcpServers": {
-    "openclaw-bridge": {
-      "type": "remote",
-      "url": "http://<your-local-ip>:3100/sse"
-    }
+  "openclaw-bridge": {
+    "type": "remote",
+    "url": "http://<your-local-ip>:3100/sse?apiKey=YOUR_BRIDGE_API_KEY"
   }
 }
 ```
+*(Tip: Use `tailscale ip -4` to get your secure IP)*
 
 ## 🛠 Available MCP Tools
 
