@@ -56,9 +56,26 @@ fi
 echo "------------------------------------------"
 echo -e "${GREEN}🎉 Installation Complete!${NC}"
 echo ""
-echo -e "To start the bridge, run:"
-echo -e "  ${BLUE}cd $REPO_DIR && bun run start${NC}"
-echo ""
+
+# 5. Optional Start
+if [[ -t 0 ]]; then
+    echo -e "Would you like to start the bridge now in a background tmux session? (y/N)"
+    read -r START_NOW
+    if [[ $START_NOW =~ ^[Yy]$ ]]; then
+        if command -v tmux &> /dev/null; then
+            echo -e "${BLUE}Starting bridge in tmux session 'openclaw-bridge'...${NC}"
+            # Kill existing if any
+            tmux kill-session -t openclaw-bridge 2>/dev/null || true
+            tmux new-session -d -s openclaw-bridge "cd $REPO_DIR && bun run start"
+            echo -e "${GREEN}✔ Bridge started in background (tmux).${NC}"
+            echo -e "Use ${BLUE}'tmux attach -t openclaw-bridge'${NC} to see the logs."
+        else
+            echo -e "${RED}Error: tmux is not installed. Skipping background start.${NC}"
+        fi
+    fi
+fi
+
+echo "------------------------------------------"
 echo -e "To use it in your remote agent (e.g. Cursor/OpenCode), use this URL:"
 echo -e "  ${BLUE}http://$(tailscale ip -4 2>/dev/null || echo "<your-ip>"):3100/sse?apiKey=$(grep BRIDGE_API_KEY .env | cut -d'=' -f2)${NC}"
 echo ""
