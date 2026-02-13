@@ -134,7 +134,7 @@ function registerTools(server: McpServer): void {
         method: "GET",
         path: "/snapshot",
         query: { format: format ?? "ai", targetId, profile },
-      })) as any;
+      })) as { text?: string };
 
       if (prune && result && typeof result.text === "string") {
         // Smart pruning: remove empty/meaningless lines and excessive whitespace
@@ -166,7 +166,12 @@ function registerTools(server: McpServer): void {
       const result = await gateway.call("node.invoke", {
         nodeId,
         command: "system.run",
-        params: { command: ["bash", "-c", command], rawCommand: command, cwd, commandTimeout: timeoutMs },
+        params: {
+          command: ["bash", "-c", command],
+          rawCommand: command,
+          cwd,
+          commandTimeout: timeoutMs,
+        },
         idempotencyKey: crypto.randomUUID(),
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -194,7 +199,8 @@ const httpServer = createServer(async (req, res) => {
 
   // Auth check if BRIDGE_API_KEY is set
   if (BRIDGE_API_KEY) {
-    const apiKey = req.headers["x-api-key"] || url.searchParams.get("apiKey") || url.searchParams.get("api-key");
+    const apiKey =
+      req.headers["x-api-key"] || url.searchParams.get("apiKey") || url.searchParams.get("api-key");
     if (apiKey !== BRIDGE_API_KEY) {
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Unauthorized: Invalid or missing BRIDGE_API_KEY" }));
