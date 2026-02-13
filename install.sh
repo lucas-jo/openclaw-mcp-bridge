@@ -72,11 +72,15 @@ if [ -c /dev/tty ]; then
     if [[ $START_NOW =~ ^[Yy]$ ]]; then
         if command -v tmux &> /dev/null; then
             echo -e "${BLUE}Starting bridge in tmux session 'openclaw-bridge'...${NC}"
+            # Resolve absolute paths for stability in tmux
+            BUN_PATH=$(command -v bun)
+            TMUX_PATH=$(command -v tmux)
+            
             # Kill existing if any
-            tmux kill-session -t openclaw-bridge 2>/dev/null || true
-            tmux new-session -d -s openclaw-bridge "cd $REPO_DIR && bun run start"
+            $TMUX_PATH kill-session -t openclaw-bridge 2>/dev/null || true
+            $TMUX_PATH new-session -d -s openclaw-bridge "cd $REPO_DIR && $BUN_PATH run start"
             echo -e "${GREEN}✔ Bridge started in background (tmux).${NC}"
-            echo -e "Use ${BLUE}'tmux attach -t openclaw-bridge'${NC} to see the logs."
+            echo -e "Use ${BLUE}'$TMUX_PATH attach -t openclaw-bridge'${NC} to see the logs."
         else
             echo -e "${RED}Error: tmux is not installed. Skipping background start.${NC}"
         fi

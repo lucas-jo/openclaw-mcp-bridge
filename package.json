@@ -1,6 +1,6 @@
 {
   "name": "openclaw-bridge-remote",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Model Context Protocol (MCP) bridge for OpenClaw Gateway",
   "main": "src/index.ts",
   "bin": {
