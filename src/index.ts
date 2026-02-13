@@ -194,7 +194,7 @@ const httpServer = createServer(async (req, res) => {
 
   // Auth check if BRIDGE_API_KEY is set
   if (BRIDGE_API_KEY) {
-    const apiKey = req.headers["x-api-key"] || url.searchParams.get("apiKey");
+    const apiKey = req.headers["x-api-key"] || url.searchParams.get("apiKey") || url.searchParams.get("api-key");
     if (apiKey !== BRIDGE_API_KEY) {
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Unauthorized: Invalid or missing BRIDGE_API_KEY" }));
