@@ -1,117 +1,144 @@
-# OpenCode ↔ OpenClaw Bridge
+# Detailed Setup Guide
 
-Remote OpenCode (Resourceful Remote machine) delegates local-only tasks to OpenClaw Gateway running on MacBook via Tailscale mesh VPN.
+This document covers the full architecture, manual setup steps, protocol details, and troubleshooting for the OpenClaw MCP Bridge.
 
 ## Architecture
 
 ```
-┌────────────────────────────────┐         Tailscale          ┌──────────────────────────────────┐
-│  Remote Machine (Resourceful)  │      100.x ↔ 100.x         │  MacBook (Local)                 │
-│                                │                            │                                  │
-│  OpenCode                      │                            │  ┌────────────────────────┐      │
-│    └─ MCP Client ──────────────┼── SSE http :3100/sse ──────┼──┤ openclaw-bridge-remote │      │
-│       (openclaw-bridge)        │                            │  │ (MCP Server)           │      │
-│                                │                            │  └────────┬───────────────┘      │
-│                                │                            │           │ ws://127.0.0.1:18790 │
-│                                │                            │  ┌────────▼───────────────┐      │
-│                                │                            │  │ OpenClaw Gateway       │      │
-│                                │                            │  │ (port 18790)           │      │
-│                                │                            │  └────────┬───────────────┘      │
-│                                │                            │           │ WS (loopback)        │
-│                                │                            │  ┌────────▼───────────────┐      │
-│                                │                            │  │ OpenClaw Node Host     │      │
-│                                │                            │  │ (macbook-node)         │      │
-│                                │                            │  │ caps: browser,system   │      │
-│                                │                            │  └────────────────────────┘      │
-└────────────────────────────────┘                            └──────────────────────────────────┘
+┌────────────────────────────────┐                              ┌──────────────────────────────────┐
+│  Remote Machine                │         Tailscale/VPN        │  Local Machine (e.g. MacBook)    │
+│                                │        or SSH Tunnel          │                                  │
+│  AI Agent (OpenCode/Cursor)    │                              │  ┌────────────────────────┐      │
+│    └─ MCP Client ──────────────┼── SSE http :3100/sse ────────┼──┤ openclaw-bridge-remote │      │
+│       (openclaw-remote)        │   (x-api-key header)         │  │ (MCP Server)           │      │
+│                                │                              │  └────────┬───────────────┘      │
+│                                │                              │           │ ws://127.0.0.1:18790 │
+│                                │                              │  ┌────────▼───────────────┐      │
+│                                │                              │  │ OpenClaw Gateway       │      │
+│                                │                              │  │ (port 18790)           │      │
+│                                │                              │  └────────┬───────────────┘      │
+│                                │                              │           │ WebSocket            │
+│                                │                              │  ┌────────▼───────────────┐      │
+│                                │                              │  │ OpenClaw Node Host     │      │
+│                                │                              │  │ (e.g. macbook-node)    │      │
+│                                │                              │  │ caps: browser, system  │      │
+│                                │                              │  └────────────────────────┘      │
+└────────────────────────────────┘                              └──────────────────────────────────┘
 ```
-
-## Network
-
-| Host               | Tailscale IP  | Role                                    |
-| ------------------ | ------------- | --------------------------------------- |
-| Remote Machine     | 100.107.38.98 | Remote dev machine (OpenCode)           |
-| lucass-macbook-pro | 100.106.94.64 | Local machine (OpenClaw Gateway + Node) |
 
 ## Components
 
 ### 1. OpenClaw Gateway (port 18790, loopback)
 
-Already running on MacBook as a system service. Provides the control plane for all OpenClaw operations.
+Already running on your local machine as a system service. Provides the control plane for all OpenClaw operations.
 
 ### 2. openclaw-bridge-remote (port 3100, 0.0.0.0)
 
 Custom MCP server that translates MCP tool calls into OpenClaw Gateway WebSocket RPC.
 
-- **Location**: `~/openclaw-bridge-remote/` on MacBook
-- **Runs in**: tmux session `openclaw-bridge-remote`
+- **Location**: `~/openclaw-bridge-remote/` on your local machine
 - **Connects to**: Gateway at `ws://127.0.0.1:18790`
 - **Exposes**: SSE MCP endpoint at `http://0.0.0.0:3100/sse`
-- **Auth**: Ed25519 device identity + challenge-response signing
+- **Auth**: `x-api-key` header (bridge) + Ed25519 challenge-response signing (gateway)
 
 ### 3. OpenClaw Node Host
 
 Headless node that executes commands on behalf of the Gateway.
 
-- **Runs in**: tmux session `macbook-node`
 - **Capabilities**: `browser`, `system`
 - **Commands**: `system.run`, `system.which`, `browser.proxy`
 
 ## Available MCP Tools
 
-| Tool                          | Description                                | Requires Node |
-| ----------------------------- | ------------------------------------------ | :-----------: |
-| `openclaw_gateway_call`       | Raw Gateway RPC (health, config, sessions) |      No       |
-| `openclaw_nodes_list`         | List connected nodes                       |      No       |
-| `openclaw_nodes_invoke`       | Invoke any node command                    |      Yes      |
-| `openclaw_system_run`         | Execute shell command on MacBook           |      Yes      |
-| `openclaw_browser_navigate`   | Navigate browser\*                         |      Yes      |
-| `openclaw_browser_screenshot` | Take screenshot\*                          |      Yes      |
-| `openclaw_browser_snapshot`   | Accessibility tree\*                       |      Yes      |
-| `openclaw_browser_click`      | Click element\*                            |      Yes      |
-| `openclaw_browser_type`       | Type text\*                                |      Yes      |
-| `openclaw_browser_evaluate`   | Run JavaScript\*                           |      Yes      |
-| `openclaw_browser_tabs`       | List browser tabs\*                        |      Yes      |
-| `openclaw_browser_open`       | Open new tab\*                             |      Yes      |
+| Tool                        | Description                                                     | Requires Node |
+| --------------------------- | --------------------------------------------------------------- | :-----------: |
+| `openclaw_browser`          | Unified browser control (navigate, click, type, tabs, open, evaluate) |      Yes      |
+| `openclaw_browser_screenshot` | Capture browser screenshot (PNG/JPEG)                          |      Yes      |
+| `openclaw_browser_snapshot` | Get accessibility tree for AI reasoning (with smart pruning)    |      Yes      |
+| `openclaw_system_run`       | Execute shell commands on the local machine                     |      Yes      |
+| `openclaw_gateway_call`     | Direct RPC access to OpenClaw Gateway (e.g. `node.list`)        |      No       |
 
-\*Browser tools route through `node.invoke` with `browser.proxy`.
+### `openclaw_browser` actions
 
-## Setup (from scratch)
+| Action     | Parameters                  | Description               |
+| ---------- | --------------------------- | ------------------------- |
+| `navigate` | `url`, `targetId?`          | Navigate to a URL         |
+| `click`    | `ref`, `targetId?`          | Click an element          |
+| `type`     | `ref`, `text`, `targetId?`  | Type text into an element |
+| `tabs`     | `profile?`                  | List open browser tabs    |
+| `open`     | `url`, `profile?`           | Open a new tab            |
+| `evaluate` | `fn`, `targetId?`           | Run JavaScript in page    |
+
+All browser actions accept an optional `profile` parameter (`chrome` or `openclaw`).
+
+## Manual Setup (Step by Step)
 
 ### Prerequisites
 
-- Tailscale installed and connected on both machines
-- OpenClaw installed on MacBook with Gateway running
-- SSH access from remote to MacBook via Tailscale
-- Bun runtime on MacBook
+- [Bun](https://bun.sh) runtime installed
+- [OpenClaw](https://openclaw.ai) installed with Gateway running
+- Network connectivity between remote and local machine (Tailscale, SSH tunnel, etc.)
 
-### Step 1: Deploy bridge to MacBook
-
-```bash
-# From remote machine
-rsync -avz --exclude node_modules --exclude dist \
-  /path/to/openclaw-bridge-remote/ \
-  <macbook-tailscale-ip>:~/openclaw-bridge-remote/
-ssh <macbook-tailscale-ip> "cd ~/openclaw-bridge-remote && ~/.bun/bin/bun install"
-```
-
-### Step 2: Start bridge (MacBook)
+### Step 1: Clone and install
 
 ```bash
-tmux new-session -d -s openclaw-bridge-remote
-tmux send-keys -t openclaw-bridge-remote \
-  'OPENCLAW_GATEWAY_TOKEN=<token> bun run ~/openclaw-bridge-remote/src/index.ts' Enter
+# On your local machine
+git clone https://github.com/lucas-jo/openclaw-bridge-remote.git ~/openclaw-bridge-remote
+cd ~/openclaw-bridge-remote
+bun install
 ```
 
-### Step 3: Start node host (MacBook)
+### Step 2: Get your Gateway token
 
 ```bash
-tmux new-session -d -s macbook-node
-tmux send-keys -t macbook-node \
-  'OPENCLAW_GATEWAY_TOKEN=<token> openclaw node run --port <gateway-port> --display-name macbook-node' Enter
+openclaw config get gateway.auth.token
 ```
 
-### Step 4: Configure exec allowlist (MacBook)
+### Step 3: Create `.env` file
+
+```bash
+cat <<EOF > ~/openclaw-bridge-remote/.env
+OPENCLAW_GATEWAY_TOKEN=<paste-your-token-here>
+OPENCLAW_GATEWAY_HOST=127.0.0.1
+OPENCLAW_GATEWAY_PORT=18790
+BRIDGE_PORT=3100
+BRIDGE_API_KEY=$(openssl rand -hex 16)
+EOF
+```
+
+Save the generated `BRIDGE_API_KEY` — you'll need it for the MCP client config.
+
+### Step 4: Start the bridge
+
+```bash
+# Option A: Foreground (for debugging)
+cd ~/openclaw-bridge-remote && bun run start
+
+# Option B: Background via tmux
+tmux new-session -d -s openclaw-bridge "cd ~/openclaw-bridge-remote && bun run start"
+```
+
+You should see:
+```
+[bridge] Gateway connected: 127.0.0.1:18790
+[bridge] MCP SSE server listening on http://0.0.0.0:3100
+```
+
+### Step 5: Ensure a Node is running
+
+The bridge needs at least one OpenClaw Node connected for browser/system tools:
+
+```bash
+# Check if a node is already running
+openclaw node list
+
+# If no node is connected, start one
+openclaw node run --display-name macbook-node
+```
+
+### Step 6: Configure exec allowlist
+
+For `openclaw_system_run` to work without manual approval:
 
 ```bash
 openclaw approvals allowlist add --agent '*' '/bin/bash'
@@ -120,24 +147,34 @@ openclaw approvals allowlist add --agent '*' '/bin/*'
 openclaw approvals allowlist add --agent '*' '/usr/local/bin/*'
 ```
 
-### Step 5: Add to OpenCode config (Remote)
+### Step 7: Configure MCP client (on the remote machine)
+
+> **Important**: Always use `headers` with `x-api-key` for authentication.
+> Do NOT put the API key in the URL as a query parameter — it will be silently dropped
+> by the MCP SDK's SSE transport on POST requests, causing 401 errors.
 
 ```json
 {
   "mcp": {
-    "openclaw-bridge": {
+    "openclaw-remote": {
       "type": "remote",
-      "url": "http://<macbook-tailscale-ip>:3100/sse"
+      "url": "http://<your-local-ip>:3100/sse",
+      "headers": {
+        "x-api-key": "<your-BRIDGE_API_KEY>"
+      },
+      "enabled": true
     }
   }
 }
 ```
 
-### Step 6: Verify
+_(Tip: Use `tailscale ip -4` on your local machine to get the Tailscale IP)_
+
+### Step 8: Verify
 
 ```bash
-# From remote
-curl http://<macbook-tailscale-ip>:3100/health
+# From the remote machine
+curl -H "x-api-key: <your-BRIDGE_API_KEY>" http://<your-local-ip>:3100/health
 # Expected: {"status":"ok","gateway":true,"version":"0.1.0"}
 ```
 
@@ -161,24 +198,22 @@ curl http://<macbook-tailscale-ip>:3100/health
 
 ## Troubleshooting
 
-| Symptom                                 | Fix                                                                          |
-| --------------------------------------- | ---------------------------------------------------------------------------- |
-| Bridge can't connect to Gateway         | Check Gateway port: `openclaw config get gateway.port`                       |
-| "device signature invalid"              | Verify signing payload format (v2 pipe-separated)                            |
-| "client/mode must be equal to constant" | Use `mode: "cli"` for operator, `mode: "node"` for node                      |
-| "approval required" on system.run       | Add to allowlist: `openclaw approvals allowlist add --agent '*' '/bin/bash'` |
-| Node not showing in node list           | Ensure `--port` matches Gateway port, token matches                          |
-| SSE connection refused from remote      | Check bridge binds to `0.0.0.0`, not `127.0.0.1`                             |
+| Symptom                                 | Cause & Fix                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `401 Unauthorized` on MCP connect       | API key not reaching server. Use `headers: {"x-api-key": "..."}`, NOT `?apiKey=` in URL         |
+| Bridge can't connect to Gateway         | Check Gateway is running: `openclaw config get gateway.port`                                     |
+| "device signature invalid"              | Verify `OPENCLAW_GATEWAY_TOKEN` in `.env` matches `openclaw config get gateway.auth.token`       |
+| "approval required" on system.run       | Add to allowlist: `openclaw approvals allowlist add --agent '*' '/bin/bash'`                     |
+| Node not showing in node list           | Start a node: `openclaw node run --display-name macbook-node`                                    |
+| SSE connection refused from remote      | Check bridge binds to `0.0.0.0` (default), and firewall/network allows port 3100                |
+| Browser tools return errors             | Ensure a Node with `browser` capability is connected and Chrome/browser is accessible             |
 
 ## File Locations
 
-| File                | Host          | Path                                                                 |
-| ------------------- | ------------- | -------------------------------------------------------------------- |
-| Bridge source       | MacBook       | `~/openclaw-bridge-remote/src/`                                         |
-| Bridge source (dev) | Remote Server | `/raid/workspaces/lucasjo/new/general_research/openclaw-bridge-remote/` |
-| OpenCode config     | Remote Server | `~/.config/opencode/opencode.json`                                   |
-| OpenClaw config     | MacBook       | `~/.openclaw/openclaw.json`                                          |
-| Gateway token       | MacBook       | `openclaw config get gateway.auth.token`                             |
-| Exec approvals      | MacBook       | `~/.openclaw/exec-approvals.json`                                    |
-| Bridge log          | MacBook       | `/tmp/openclaw-bridge.log`                                           |
-| Node log            | MacBook       | tmux session `macbook-node`                                          |
+| File             | Location                                             |
+| ---------------- | ---------------------------------------------------- |
+| Bridge source    | `~/openclaw-bridge-remote/src/`                      |
+| Bridge config    | `~/openclaw-bridge-remote/.env`                      |
+| OpenClaw config  | `~/.openclaw/openclaw.json`                          |
+| Gateway token    | `openclaw config get gateway.auth.token`             |
+| Exec approvals   | `~/.openclaw/exec-approvals.json`                    |

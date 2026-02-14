@@ -87,11 +87,24 @@ if [ -c /dev/tty ]; then
     fi
 fi
 
+BRIDGE_KEY=$(grep BRIDGE_API_KEY .env | cut -d'=' -f2)
+LOCAL_IP=$(tailscale ip -4 2>/dev/null || echo "<your-ip>")
+
 echo "------------------------------------------"
-echo -e "To use it in your remote agent (e.g. Cursor/OpenCode), use this URL:"
-echo -e "  ${BLUE}http://$(tailscale ip -4 2>/dev/null || echo "<your-ip>"):3100/sse?apiKey=$(grep BRIDGE_API_KEY .env | cut -d'=' -f2)${NC}"
+echo -e "Add this to your remote agent's MCP config (OpenCode, Cursor, etc.):"
 echo ""
-echo -e "For advanced connectivity options (SSH tunneling, recipes), see:"
+echo -e "  ${BLUE}{${NC}"
+echo -e "  ${BLUE}  \"openclaw-remote\": {${NC}"
+echo -e "  ${BLUE}    \"type\": \"remote\",${NC}"
+echo -e "  ${BLUE}    \"url\": \"http://${LOCAL_IP}:3100/sse\",${NC}"
+echo -e "  ${BLUE}    \"headers\": { \"x-api-key\": \"${BRIDGE_KEY}\" }${NC}"
+echo -e "  ${BLUE}  }${NC}"
+echo -e "  ${BLUE}}${NC}"
+echo ""
+echo -e "${RED}NOTE: Use 'headers' for auth, NOT '?apiKey=' in the URL.${NC}"
+echo -e "      The MCP SDK drops query params on POST requests, causing 401 errors."
+echo ""
+echo -e "For connectivity options (SSH tunneling, Cloudflare, etc.), see:"
 echo -e "  ${BLUE}https://github.com/lucas-jo/openclaw-bridge-remote/blob/main/RECIPES.md${NC}"
 echo ""
 echo -e "Happy hybrid coding! 🦞🚀"
