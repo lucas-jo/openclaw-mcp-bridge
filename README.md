@@ -16,6 +16,17 @@ When working on powerful remote servers (GPU clusters, cloud instances, etc.), A
 - **Secure Authentication**: API key via HTTP headers + OpenClaw Ed25519 challenge-response signing.
 - **Hybrid Routing**: Intelligently routes commands between the OpenClaw Gateway and connected Nodes.
 
+## 🎯 Use Cases
+
+### 1. Remote Development with Local Eyes
+Run heavy AI models or IDE backends on a powerful cloud server while letting the AI see and control your local browser for previewing changes.
+
+### 2. "Job Done" Physical Notification (HomePod)
+Combine this bridge with [**homepod-announcer-skill**](https://github.com/lucas-jo/homepod-announcer-skill) to let your remote AI agent speak to you when a long task completes.
+- **Remote Agent**: "Training finished. Sending notification to local HomePod."
+- **Local Bridge**: Receives request -> Forwards to local HomePod Skill.
+- **HomePod**: *"Sir, your model training is complete with 98% accuracy."*
+
 ## Architecture
 
 ```mermaid
